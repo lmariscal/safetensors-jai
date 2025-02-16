@@ -2,7 +2,7 @@
 #import "File";
 #import "String";
 #import "Hash_Table";
-#import "jaison";
+#import,file "./modules/jaison/module.jai";
 
 SafeTensors_Type :: enum u32 {
     UNKNOWN :: 0x00;
@@ -41,15 +41,6 @@ SafeTensor :: struct {
     items: [..]SafeTensors_Item;
 }
 
-free :: (using safe: SafeTensor) {
-    for items {
-        free(it.name);
-        array_free(it.shape);
-    }
-    array_free(safe.items);
-    free(raw.file);
-}
-
 load_safe_raw :: (file: string) -> result: SafeTensors_Raw = .{}, ok: bool = true {
     raw: SafeTensors_Raw = ---;
     ok: bool;
@@ -66,6 +57,16 @@ load_safe_raw :: (file: string) -> result: SafeTensors_Raw = .{}, ok: bool = tru
     raw.body.count = raw.file.count - size_of(u64) + raw.header.count;
 
     return raw;
+}
+
+// recommended to pass the temp allocator, but providing a free function just in case
+free :: (using safe: SafeTensor) {
+    for items {
+        free(it.name);
+        array_free(it.shape);
+    }
+    array_free(safe.items);
+    free(raw.file);
 }
 
 load_safe :: (file: string) -> result: SafeTensor = .{}, ok: bool = true {
@@ -161,6 +162,7 @@ find_item :: inline (safe: *SafeTensor, name: string) -> *SafeTensors_Item {
     return item;
 }
 
+// returns a slice of the data in the safetensor
 view_item_data :: (safe: *SafeTensor, name: string, $type: Type) -> []type {
     // not expecting safetensors to contain many elements, so linear search should be okay
     item := find_item(safe, name);
@@ -174,6 +176,7 @@ view_item_data :: (safe: *SafeTensor, name: string, $type: Type) -> []type {
     return result;
 }
 
+// returns a copy of the data in the safetensor
 get_item_data :: (safe: *SafeTensor, name: string, $type: Type) -> []type {
     // not expecting safetensors to contain many elements, so linear search should be okay
     item := find_item(safe, name);
@@ -185,15 +188,4 @@ get_item_data :: (safe: *SafeTensor, name: string, $type: Type) -> []type {
     memcpy(result.data, safe.raw.body.data + item.data_offsets[0], total_byte_size);
 
     return result;
-}
-
-main :: () {
-    tensor, ok := load_safe("misc.safetensors");
-    defer free(tensor);
-
-    log("%", tensor.raw.header);
-    embedding := get_item_data(*tensor, "attention", float64);
-    defer array_free(embedding);
-
-    log("%", embedding);
 }

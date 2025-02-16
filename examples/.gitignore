@@ -1,0 +1,5 @@
+*
+
+!*.jai
+!.gitignore
+!sample.safetensors
